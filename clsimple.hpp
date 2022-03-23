@@ -255,7 +255,7 @@ public:
         return getKeyPos(inKey) != -1;
     }
 
-    void parse(){
+    bool parse(){
         bool parseIsOK = true;
         int usedFields = 0;
 
@@ -299,6 +299,7 @@ public:
                 _isValid = false;
             }
         }
+        return _isValid;
     }
 
     template <class ParamType>
@@ -339,8 +340,20 @@ public:
         inStream << std::endl;
     }
 
-    template <class ValType, class KeyType>
-    static ValType GetMapping(const KeyType& inKey, const std::vector<std::pair<KeyType,ValType>>& inMapping,
+    template <class ValType>
+    static ValType GetMapping(const std::string& inKey, const std::vector<std::pair<std::string,ValType>>& inMapping,
+                              const ValType defaultVal = ValType()){
+        for(auto& mp : inMapping){
+            if(mp.first == inKey){
+                return mp.second;
+            }
+        }
+        return defaultVal;
+    }
+
+    template <class ValType>
+    static ValType GetMapping(const std::string& inKey,
+                              std::initializer_list<std::pair<std::string, ValType>> inMapping,
                               const ValType defaultVal = ValType()){
         for(auto& mp : inMapping){
             if(mp.first == inKey){
