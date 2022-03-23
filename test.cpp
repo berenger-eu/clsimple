@@ -7,7 +7,7 @@
 int omp_get_max_threads(){ return 10;}// TODO
 
 int main(int argc, char** argv){
-    CLsimple args(argc, argv);
+    CLsimple args("Complexespp", argc, argv);
 
     std::vector<std::string> multidir;
     args.addMultiParameter<std::string>("multidir", "multiple simulation directories",
@@ -35,12 +35,12 @@ int main(int argc, char** argv){
                             version, false);
 
     int replex;
-    args.addParameter<int>("version", "number of sweeps between exchanges",
-                           version, 0);
+    args.addParameter<int>("replex", "number of sweeps between exchanges",
+                           replex, 0);
 
     int replex_stat;
     args.addParameter<int>("replex_stat", "number of sweeps between statistic output",
-                           version, 1000);
+                           replex_stat, 1000);
 
     std::string replex_accept;
     args.addParameter<std::string>("replex_accept", "exchange accept function",
@@ -74,7 +74,7 @@ int main(int argc, char** argv){
     std::cout << "hasKey help: " << args.hasKey("help") << std::endl;
     std::cout << "hasKey version: " << args.hasKey("version") << std::endl;
 
-    std::cout << "values multidir ";
+    std::cout << "values multidir (" << multidir.size() << ") ";
     for(auto& dr : multidir){
         std::cout << " " << dr;
     }
@@ -92,6 +92,10 @@ int main(int argc, char** argv){
     std::cout << "movestats: " << movestats << std::endl;
     std::cout << "nb_threads: " << nb_threads << std::endl;
     std::cout << "replex_verbosity: " << replex_verbosity << std::endl;
+
+    ////////////////////////////////////////////////////
+
+    args.printHelp(std::cout);
 
     return 0;
 }

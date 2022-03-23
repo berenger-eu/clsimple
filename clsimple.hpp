@@ -1,3 +1,9 @@
+//////////////////////////////////////////////////////
+/// MIT License, 2022
+/// Author: Bérenger Bramas
+/// See https://gitlab.inria.fr/bramas/clsimple
+//////////////////////////////////////////////////////
+
 #ifndef CLSIMPLE_HPP
 #define CLSIMPLE_HPP
 
@@ -7,7 +13,9 @@
 #include <optional>
 #include <regex>
 #include <sstream>
-#include <iostream> // TODO
+#include <typeinfo>
+#include <type_traits>
+
 
 class CLsimple{
     template <class ParamType>
@@ -19,6 +27,23 @@ class CLsimple{
             (*outFlag) = bool(iss.eof());
         }
         return value;
+    }
+
+    template <class ParamType>
+    static std::string TypeToStr(){
+        if constexpr(std::is_same<ParamType,bool>::value){
+            return "Boolean";
+        }
+        if constexpr(std::numeric_limits<ParamType>::is_integer){
+            return "Integer";
+        }
+        if constexpr(std::is_floating_point<ParamType>::value){
+            return "Real number";
+        }
+        if constexpr(std::is_same<ParamType,std::string>::value){
+            return "String";
+        }
+        return typeid(std::remove_reference_t<ParamType>).name();
     }
 
     class AbstractParam{
@@ -36,110 +61,148 @@ class CLsimple{
             return _key;
         }
 
+        std::string getHelp() const{
+            return _help;
+        }
+
         bool isMulti() const {
             return _isMulti;
         }
 
         virtual bool applyValue(const std::string& inValue) = 0;
         virtual void applyDefault() = 0;
+        virtual std::string getTypeStr() const = 0;
     };
 
     template <class ParamType>
     class MultiParam : public AbstractParam{
-        std::optional<std::vector<ParamType>> _variable;
+        std::optional<std::reference_wrapper<std::vector<ParamType>>> _variable;
         const std::vector<ParamType> _default;
 
     public:
         MultiParam(std::string inKey,
                    std::string inHelp,
-                   std::optional<std::vector<ParamType>> inVariable,
+                   std::optional<std::reference_wrapper<std::vector<ParamType>>> inVariable,
                    std::vector<ParamType> inDefault):
-            AbstractParam(std::move(inKey), std::move(inHelp), false),
+            AbstractParam(std::move(inKey), std::move(inHelp), true),
             _variable(std::move(inVariable)),
             _default(std::move(inDefault)){}
 
         bool applyValue(const std::string& inValue) final{
-            bool convertionOk;
-            auto value = Convert<ParamType>(inValue, &convertionOk);
-            if(_variable && convertionOk){
-                _variable->push_back(value);
-                return true;
+            if constexpr (std::is_same<ParamType, bool>::value){
+                bool convertionOkInt;
+                auto valueInt = Convert<int>(inValue, &convertionOkInt);
+                if(_variable && convertionOkInt){
+                    _variable->get().push_back(bool(valueInt));
+                    return true;
+                }
+                bool convertionOkStr;
+                auto valueStr = Convert<std::string>(inValue, &convertionOkStr);
+                if(_variable && convertionOkStr){
+                    _variable->get().push_back(valueStr == "TRUE" || valueStr == "true");
+                    return true;
+                }
+                return false;
             }
-            return false;
+            else{
+                bool convertionOk;
+                auto value = Convert<ParamType>(inValue, &convertionOk);
+                if(_variable && convertionOk){
+                    _variable->get().push_back(value);
+                    return true;
+                }
+                return false;
+            }
         }
         void applyDefault() final{
             if(_variable){
-                _variable = _default;
+                _variable->get() = _default;
             }
+        }
+        std::string getTypeStr() const final{
+            return "List of " + TypeToStr<ParamType>() + "s";
         }
     };
 
 
     template <class ParamType>
     class Param : public AbstractParam{
-        std::optional<ParamType> _variable;
+        std::optional<std::reference_wrapper<ParamType>> _variable;
         const ParamType _default;
 
     public:
         Param(std::string inKey,
               std::string inHelp,
-              std::optional<ParamType> inVariable,
+              std::optional<std::reference_wrapper<ParamType>> inVariable,
               ParamType inDefault):
-            AbstractParam(std::move(inKey), std::move(inHelp), true),
+            AbstractParam(std::move(inKey), std::move(inHelp), false),
             _variable(std::move(inVariable)),
             _default(std::move(inDefault)){}
 
         bool applyValue(const std::string& inValue) final{
-            bool convertionOk;
-            auto value = Convert<ParamType>(inValue, &convertionOk);
-            if(_variable && convertionOk){
-                _variable = _default;
-                return true;
+            if constexpr (std::is_same<ParamType, bool>::value){
+                bool convertionOkInt;
+                auto valueInt = Convert<int>(inValue, &convertionOkInt);
+                if(_variable && convertionOkInt){
+                    _variable->get() = bool(valueInt);
+                    return true;
+                }
+                bool convertionOkStr;
+                auto valueStr = Convert<std::string>(inValue, &convertionOkStr);
+                if(_variable && convertionOkStr){
+                    _variable->get() = (valueStr == "TRUE" || valueStr == "true");
+                    return true;
+                }
+                return false;
             }
-            return false;
+            else{
+                bool convertionOk;
+                auto value = Convert<ParamType>(inValue, &convertionOk);
+                if(_variable && convertionOk){
+                    _variable->get() = value;
+                    return true;
+                }
+                _variable->get() = _default;
+                return false;
+            }
         }
         void applyDefault() final{
             if(_variable){
-                _variable = _default;
+                _variable->get() = _default;
             }
+        }
+        std::string getTypeStr() const final{
+            return TypeToStr<ParamType>();
         }
     };
 
     static bool StrSeemsAKey(const std::string& str){
         std::regex keyFormat("-{1,2}(\\D|[0-9]\\D)");
-        std::cout << "StrSeemsAKey = "<< str << " => " << bool(std::regex_search(str, keyFormat)) << std::endl;//TODO
         return std::regex_search(str, keyFormat);
     }
 
     static std::string StrToKey(const std::string& str){
         std::regex keyValueFormat("-{1,2}([^=]+).*");
-        std::sregex_iterator iter = std::sregex_iterator(str.begin(), str.end(), keyValueFormat);
-        if(iter == std::sregex_iterator()){
-            return "INVALID-FORMAT";
-        }
-        std::cout << "StrToKey = "<< str << " => " << *(iter.sub_match()).str() << std::endl;//TODO
-        return (*iter).str();
+        std::smatch match;
+        std::regex_search(str, match, keyValueFormat);
+        return match[1];
     }
 
     static bool IsKeyValueFormat(const std::string& str){
         std::regex keyValueFormat("--[^=]+=.+");
-        std::cout << "IsKeyValueFormat = "<< str << " => " << bool(std::regex_search(str, keyValueFormat)) << std::endl;//TODO
         return std::regex_search(str, keyValueFormat);
     }
 
     static std::pair<std::string,std::string> SplitKeyValue(const std::string& str){
         std::regex keyValueFormat("--([^=]+)=(.+)");
-        std::sregex_iterator iter = std::sregex_iterator(str.begin(), str.end(), keyValueFormat);
-        if(iter == std::sregex_iterator() || std::distance(iter, std::sregex_iterator()) < 2){
-            return std::pair<std::string,std::string>();
-        }
-        const std::string key = (*iter).str();
-        (++iter);
-        const std::string value = (*iter).str();
-        std::cout << "SplitKeyValue = "<< str << " => " << key << " / " << value << std::endl;//TODO
+        std::smatch match;
+        std::regex_search(str, match, keyValueFormat);
+        const std::string key = match[1];
+        const std::string value = match[2];
         return std::pair<std::string,std::string>(std::move(key), std::move(value));
     }
 
+    const std::string _title;
 
     std::vector<std::string> _argv;
     std::vector<std::unique_ptr<AbstractParam>> _params;
@@ -149,10 +212,12 @@ class CLsimple{
     bool _isValid;
 
 public:
-    CLsimple(const int argc, char** argv,
+    CLsimple(const std::string inTitle,
+             const int argc, char** argv,
              const bool inFailsIfInvalid = true,
              const bool inAcceptUnregisteredParams = true)
-        : _failsIfInvalid(inFailsIfInvalid),
+        : _title(std::move(inTitle)),
+          _failsIfInvalid(inFailsIfInvalid),
           _acceptUnregisteredParams(inAcceptUnregisteredParams),
           _isValid(true) {
         _argv.reserve(argc-1);
@@ -237,7 +302,7 @@ public:
 
     template <class ParamType>
     void addMultiParameter(std::string inKey, std::string inHelp,
-                           std::optional<std::vector<ParamType>> inVariable = std::nullopt,
+                           std::optional<std::reference_wrapper<std::vector<ParamType>>> inVariable = std::nullopt,
                            std::vector<ParamType> inDefaultValue = std::vector<ParamType>()){
         std::unique_ptr<AbstractParam> newParam(new MultiParam<ParamType>(
                                                     std::move(inKey),
@@ -250,7 +315,7 @@ public:
 
     template <class ParamType>
     void addParameter(std::string inKey, std::string inHelp,
-                      std::optional<ParamType> inVariable = std::nullopt,
+                      std::optional<std::reference_wrapper<ParamType>> inVariable = std::nullopt,
                       ParamType inDefaultValue = ParamType()){
         std::unique_ptr<AbstractParam> newParam(new Param<ParamType>(
                                                     std::move(inKey),
@@ -259,6 +324,18 @@ public:
                                                     std::move(inDefaultValue)
                                                     ));
         _params.emplace_back(std::move(newParam));
+    }
+
+    template <class StreamClass>
+    void printHelp(StreamClass& inStream) const{
+        inStream << "[HELP] " << _title << "\n";
+        for(auto& param : _params){
+            inStream << "[HELP] Parameter name: " << param->getKey() << "\n";
+            inStream << "[HELP]  - Description: " << param->getHelp() << "\n";
+            inStream << "[HELP]  - Type: " << param->getTypeStr() << "\n";
+            inStream << "[HELP]\n";
+        }
+        inStream << std::endl;
     }
 };
 
