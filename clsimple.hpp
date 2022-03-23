@@ -205,7 +205,7 @@ class CLsimple{
     const std::string _title;
 
     std::vector<std::string> _argv;
-    std::vector<std::unique_ptr<AbstractParam>> _params;
+    std::shared_ptr<std::vector<std::unique_ptr<AbstractParam>>> _params;
 
     bool _failsIfInvalid;
     bool _acceptUnregisteredParams;
@@ -217,6 +217,7 @@ public:
              const bool inFailsIfInvalid = true,
              const bool inAcceptUnregisteredParams = true)
         : _title(std::move(inTitle)),
+          _params(new std::vector<std::unique_ptr<AbstractParam>>),
           _failsIfInvalid(inFailsIfInvalid),
           _acceptUnregisteredParams(inAcceptUnregisteredParams),
           _isValid(true) {
@@ -226,8 +227,8 @@ public:
         }
     }
 
-    CLsimple(const CLsimple&) = delete;
-    CLsimple& operator=(const CLsimple&) = delete;
+    CLsimple(const CLsimple&) = default;
+    CLsimple& operator=(const CLsimple&) = default;
 
     bool failsIfInvalid() const{
         return _failsIfInvalid;
@@ -258,7 +259,7 @@ public:
         bool parseIsOK = true;
         int usedFields = 0;
 
-        for(auto& param : _params){
+        for(auto& param : *_params){
             const int pos = getKeyPos(param->getKey());
             if(pos == -1){
                 param->applyDefault();
@@ -310,7 +311,7 @@ public:
                                                     std::move(inVariable),
                                                     std::move(inDefaultValue)
                                                     ));
-        _params.emplace_back(std::move(newParam));
+        (*_params).emplace_back(std::move(newParam));
     }
 
     template <class ParamType>
@@ -323,19 +324,30 @@ public:
                                                     std::move(inVariable),
                                                     std::move(inDefaultValue)
                                                     ));
-        _params.emplace_back(std::move(newParam));
+        (*_params).emplace_back(std::move(newParam));
     }
 
     template <class StreamClass>
     void printHelp(StreamClass& inStream) const{
         inStream << "[HELP] " << _title << "\n";
-        for(auto& param : _params){
+        for(auto& param : *_params){
             inStream << "[HELP] Parameter name: " << param->getKey() << "\n";
             inStream << "[HELP]  - Description: " << param->getHelp() << "\n";
             inStream << "[HELP]  - Type: " << param->getTypeStr() << "\n";
             inStream << "[HELP]\n";
         }
         inStream << std::endl;
+    }
+
+    template <class ValType, class KeyType>
+    static ValType GetMapping(const KeyType& inKey, const std::vector<std::pair<KeyType,ValType>>& inMapping,
+                              const ValType defaultVal = ValType()){
+        for(auto& mp : inMapping){
+            if(mp.first == inKey){
+                return mp.second;
+            }
+        }
+        return defaultVal;
     }
 };
 
