@@ -213,7 +213,7 @@ class CLsimple{
 
 public:
     CLsimple(const std::string inTitle,
-             const int argc, char** argv,
+             const int argc, const char *const argv[],
              const bool inFailsIfInvalid = true,
              const bool inAcceptUnregisteredParams = true)
         : _title(std::move(inTitle)),
