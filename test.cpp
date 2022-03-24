@@ -9,6 +9,9 @@ int omp_get_max_threads(){ return 10;}// TODO
 int main(int argc, char** argv){
     CLsimple args("Complexespp", argc, argv);
 
+    args.addParameterNoArg("help", "help");
+    args.addParameterNoArg("version", "version");
+
     std::vector<std::string> multidir;
     args.addMultiParameter<std::string>("multidir", "multiple simulation directories",
                                     multidir);
