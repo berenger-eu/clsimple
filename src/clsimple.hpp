@@ -104,12 +104,12 @@ class CLsimple{
         const std::vector<ParamType> _default;
 
     public:
-        MultiParam(std::string inKey,
+        MultiParam(std::vector<std::string> inKeys,
                    std::string inHelp,
                    const bool inIsMandatory,
                    std::optional<std::reference_wrapper<std::vector<ParamType>>> inVariable,
                    std::vector<ParamType> inDefault):
-            AbstractParam(std::move(inKey), std::move(inHelp), Multi, inIsMandatory),
+            AbstractParam(std::move(inKeys), std::move(inHelp), Multi, inIsMandatory),
             _variable(std::move(inVariable)),
             _default(std::move(inDefault)){}
 
@@ -250,7 +250,7 @@ class CLsimple{
         const auto& keys = param->getKeys();
         int pos = -1;
         for(const auto& key : keys){
-            const int testPos = getKeyPos(param->getKey());
+            const int testPos = getKeyPos(key);
             if(testPos != -1){
                 pos = testPos;
                 break;
@@ -468,7 +468,7 @@ public:
 
         inStream << "[HELP] " << _title << "\n";
         for(auto& param : *_params){
-            inStream << "[HELP] Parameter name: " << join(param->getKeys(),", ")) << "}\n";
+            inStream << "[HELP] Parameter name: " << join(param->getKeys(),", ") << "}\n";
             inStream << "[HELP]  - Description: " << param->getHelp() << "\n";
             inStream << "[HELP]  - Type: " << param->getTypeStr() << "\n";
             inStream << "[HELP]  - Mandatory: " << (param->isMandatory()?"True":"False") << "\n";
