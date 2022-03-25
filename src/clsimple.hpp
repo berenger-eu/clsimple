@@ -16,6 +16,7 @@
 #include <typeinfo>
 #include <type_traits>
 #include <limits>
+#include <cassert>
 
 class CLsimple{
     template <class ParamType>
@@ -65,7 +66,9 @@ class CLsimple{
                       const ParamTypes inType,
                       const bool inIsMandatory):
             _keys(std::move(inKeys)), _help(std::move(inHelp)),
-            _paramType(inType), _isMandatory(inIsMandatory){}
+            _paramType(inType), _isMandatory(inIsMandatory){
+            assert(_keys.size());
+        }
 
         virtual ~AbstractParam(){}
 
@@ -319,6 +322,7 @@ class CLsimple{
     }
 
     const std::string _title;
+    std::string _exec;
 
     std::vector<std::string> _argv;
     std::shared_ptr<std::vector<std::unique_ptr<AbstractParam>>> _params;
@@ -337,6 +341,9 @@ public:
           _failsIfInvalid(inFailsIfInvalid),
           _acceptUnregisteredParams(inAcceptUnregisteredParams),
           _isValid(true) {
+        if(argc){
+            _exec = argv[0];
+        }
         _argv.reserve(argc-1);
         for(int idxArg = 1 ; idxArg < argc ; ++idxArg){
             _argv.emplace_back(argv[idxArg]);
@@ -455,10 +462,10 @@ public:
 
     template <class StreamClass>
     void printHelp(StreamClass& inStream) const{
-        auto join = [](const auto&& elements, const auto&& delimiter) -> std::string {
+        auto join = [](auto&& elements, auto&& delimiter) -> std::string {
             std::string res;
             for(const auto& elm : elements){
-                if(std::size(elm)){
+                if(std::size(res)){
                     res += delimiter;
                 }
                 res += elm;
@@ -466,15 +473,34 @@ public:
             return res;
         };
 
+        inStream << "[HELP] \n";
         inStream << "[HELP] " << _title << "\n";
+        inStream << "[HELP] \n";
         for(auto& param : *_params){
-            inStream << "[HELP] Parameter name: " << join(param->getKeys(),", ") << "}\n";
+            inStream << "[HELP] Parameter names: {" << join(param->getKeys(),", ") << "}\n";
             inStream << "[HELP]  - Description: " << param->getHelp() << "\n";
             inStream << "[HELP]  - Type: " << param->getTypeStr() << "\n";
             inStream << "[HELP]  - Mandatory: " << (param->isMandatory()?"True":"False") << "\n";
             inStream << "[HELP]\n";
         }
+        inStream << "[HELP]" << std::endl;
+
+
+        inStream << "[HELP] Command line with all args: " << _exec << " ";
+        for(auto& param : *_params){
+            assert(param->getKeys().size());
+            if(param->isMulti()){
+                inStream << "--" << param->getKeys()[0] << " [" << param->getTypeStr() << "] ";
+            }
+            else if(param->isSingle()){
+                inStream << "--" << param->getKeys()[0] << "=[" << param->getTypeStr() << "] ";
+            }
+            else{
+                inStream << "--" << param->getKeys()[0] << " ";
+            }
+        }
         inStream << std::endl;
+        inStream << "[HELP]" << std::endl;
     }
 
     template <class ValType>
