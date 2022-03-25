@@ -9,6 +9,19 @@ int omp_get_max_threads(){ return 10;}// TODO
 int main(int argc, char** argv){
     CLsimple args("Complexespp", argc, argv);
 
+    bool isOk;
+    const bool directBackup = args.getValue<bool>("backup", false, &isOk);
+    std::cout << "directBackup: " << directBackup << std::endl;
+
+    const std::vector<std::string> directMultiDir = args.getValues<std::string>("multidir", {}, &isOk);
+    std::cout << "values directMultiDir (" << directMultiDir.size() << ") ";
+    for(auto& dr : directMultiDir){
+        std::cout << " " << dr;
+    }
+    std::cout << std::endl;
+
+    ////////////////////////////////////////////////////
+
     args.addParameterNoArg("help", "help");
     args.addParameterNoArg("version", "version");
 
