@@ -266,11 +266,6 @@ class CLsimple{
 
         if(pos == -1){
             param->applyDefault();
-            if(param->isMandatory()){
-                if(parseIsOK){
-                    (*parseIsOK) = false;
-                }
-            }
         }
         else{
             if(usedFields){
@@ -388,10 +383,10 @@ public:
         for(const auto& key : inKeys){
             const int pos = getKeyPos(key);
             if(pos != -1){
-                return pos;
+                return true;
             }
         }
-        return -1;
+        return false;
     }
 
     bool hasOneOfKeys(std::initializer_list<std::string> inKeys) const{
