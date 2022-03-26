@@ -343,10 +343,10 @@ public:
           _isValid(true) {
         if(argc){
             _exec = argv[0];
-        }
-        _argv.reserve(argc-1);
-        for(int idxArg = 1 ; idxArg < argc ; ++idxArg){
-            _argv.emplace_back(argv[idxArg]);
+            _argv.reserve(argc-1);
+            for(int idxArg = 1 ; idxArg < argc ; ++idxArg){
+                _argv.emplace_back(argv[idxArg]);
+            }
         }
     }
 
@@ -376,6 +376,21 @@ public:
 
     bool hasKey(const std::string& inKey) const{
         return getKeyPos(inKey) != -1;
+    }
+
+    bool hasKeys(const std::vector<std::string>& inKeys) const{
+        for(const auto& key : inKeys){
+            const int pos = getKeyPos(key);
+            if(pos != -1){
+                return pos;
+            }
+        }
+        return -1;
+    }
+
+    bool hasKeys(std::initializer_list<std::string> inKeys) const{
+        std::vector<std::string> keys = inKeys;
+        return hasKeys(keys);
     }
 
     template <class ParamType>
