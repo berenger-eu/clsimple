@@ -440,18 +440,24 @@ public:
             }
         }
         // Ensure that one mandatory group is used
-        std::unordered_map<int, bool> groupState;
-        bool oneGroupIsOk = true;
+        std::unordered_map<int, bool> groupStates;
         for(auto& param : *_params){
             if(param->isMandatory()){
-                if(groupState.find(param->mandatoryGroup()) == groupState.end()){
-                    groupState[param->mandatoryGroup()] = true;
+                if(groupStates.find(param->mandatoryGroup()) == groupStates.end()){
+                    groupStates[param->mandatoryGroup()] = true;
                 }
                 const auto& keys = param->getKeys();
-                groupState[param->mandatoryGroup()] &= hasOneOfKeys(keys);
-                oneGroupIsOk &= groupState[param->mandatoryGroup()];
+                groupStates[param->mandatoryGroup()] &= hasOneOfKeys(keys);
             }
         }
+        bool oneGroupIsOk = false;
+        for(auto iter : groupStates){
+            oneGroupIsOk = iter.second;
+            if(oneGroupIsOk){
+                break;
+            }
+        }
+
         _isValid &= oneGroupIsOk;
 
         return _isValid;
