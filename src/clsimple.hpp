@@ -58,15 +58,15 @@ class CLsimple{
         const std::vector<std::string> _keys;
         const std::string _help;
         const ParamTypes _paramType;
-        const bool _isMandatory;
+        const int _mandatoryGroup;
 
     public:
         AbstractParam(std::vector<std::string> inKeys,
                       std::string inHelp,
                       const ParamTypes inType,
-                      const bool inIsMandatory):
+                      const int inMandatoryGroup):
             _keys(std::move(inKeys)), _help(std::move(inHelp)),
-            _paramType(inType), _isMandatory(inIsMandatory){
+            _paramType(inType), _mandatoryGroup(inMandatoryGroup){
             assert(_keys.size());
         }
 
@@ -93,7 +93,11 @@ class CLsimple{
         }
 
         bool isMandatory() const{
-            return _isMandatory;
+            return _mandatoryGroup != NotMandatory;
+        }
+
+        int mandatoryGroup() const{
+            return _mandatoryGroup;
         }
 
         virtual bool applyValue(const std::string& inValue) = 0;
@@ -109,10 +113,10 @@ class CLsimple{
     public:
         MultiParam(std::vector<std::string> inKeys,
                    std::string inHelp,
-                   const bool inIsMandatory,
+                   const int inMandatoryGroup,
                    std::optional<std::reference_wrapper<std::vector<ParamType>>> inVariable,
                    std::vector<ParamType> inDefault):
-            AbstractParam(std::move(inKeys), std::move(inHelp), Multi, inIsMandatory),
+            AbstractParam(std::move(inKeys), std::move(inHelp), Multi, inMandatoryGroup),
             _variable(std::move(inVariable)),
             _default(std::move(inDefault)){}
 
@@ -161,10 +165,10 @@ class CLsimple{
     public:
         Param(std::vector<std::string> inKeys,
               std::string inHelp,
-              const bool inIsMandatory,
+              const int inMandatoryGroup,
               std::optional<std::reference_wrapper<ParamType>> inVariable,
               ParamType inDefault):
-            AbstractParam(std::move(inKeys), std::move(inHelp), Single, inIsMandatory),
+            AbstractParam(std::move(inKeys), std::move(inHelp), Single, inMandatoryGroup),
             _variable(std::move(inVariable)),
             _default(std::move(inDefault)){}
 
@@ -209,8 +213,8 @@ class CLsimple{
     public:
         ParamNoArg(std::vector<std::string> inKeys,
               std::string inHelp,
-                   const bool inIsMandatory):
-            AbstractParam(std::move(inKeys), std::move(inHelp), NoArg, inIsMandatory){}
+                   const int inMandatoryGroup):
+            AbstractParam(std::move(inKeys), std::move(inHelp), NoArg, inMandatoryGroup){}
 
         bool applyValue(const std::string& inValue) final{
             return true;
@@ -332,6 +336,8 @@ class CLsimple{
     bool _isValid;
 
 public:
+    static const int NotMandatory = -1;
+
     CLsimple(const std::string inTitle,
              const int argc, const char *const argv[],
              const bool inFailsIfInvalid = true,
@@ -378,7 +384,7 @@ public:
         return getKeyPos(inKey) != -1;
     }
 
-    bool hasKeys(const std::vector<std::string>& inKeys) const{
+    bool hasOneOfKeys(const std::vector<std::string>& inKeys) const{
         for(const auto& key : inKeys){
             const int pos = getKeyPos(key);
             if(pos != -1){
@@ -388,9 +394,9 @@ public:
         return -1;
     }
 
-    bool hasKeys(std::initializer_list<std::string> inKeys) const{
+    bool hasOneOfKeys(std::initializer_list<std::string> inKeys) const{
         std::vector<std::string> keys = inKeys;
-        return hasKeys(keys);
+        return hasOneOfKeys(keys);
     }
 
     template <class ParamType>
@@ -423,6 +429,7 @@ public:
         bool parseIsOK = true;
         int usedFields = 0;
 
+        // Process param values
         for(auto& param : *_params){
             processParam(param, &parseIsOK, &usedFields);
         }
@@ -432,6 +439,21 @@ public:
                 _isValid = false;
             }
         }
+        // Ensure that one mandatory group is used
+        std::unordered_map<int, bool> groupState;
+        bool oneGroupIsOk = true;
+        for(auto& param : *_params){
+            if(param->isMandatory()){
+                if(groupState.find(param->mandatoryGroup()) == groupState.end()){
+                    groupState[param->mandatoryGroup()] = true;
+                }
+                const auto& keys = param->getKeys();
+                groupState[param->mandatoryGroup()] &= hasOneOfKeys(keys);
+                oneGroupIsOk &= groupState[param->mandatoryGroup()];
+            }
+        }
+        _isValid &= oneGroupIsOk;
+
         return _isValid;
     }
 
@@ -439,11 +461,11 @@ public:
     void addMultiParameter(std::vector<std::string> inKeys, std::string inHelp,
                            std::optional<std::reference_wrapper<std::vector<ParamType>>> inVariable = std::nullopt,
                            std::vector<ParamType> inDefaultValue = std::vector<ParamType>(),
-                           const bool inIsMandatory = false){
+                           const int inMandatoryGroup = NotMandatory){
         std::unique_ptr<AbstractParam> newParam(new MultiParam<ParamType>(
                                                     std::move(inKeys),
                                                     std::move(inHelp),
-                                                    inIsMandatory,
+                                                    inMandatoryGroup,
                                                     std::move(inVariable),
                                                     std::move(inDefaultValue)
                                                     ));
@@ -454,11 +476,11 @@ public:
     void addParameter(std::vector<std::string> inKeys, std::string inHelp,
                       std::optional<std::reference_wrapper<ParamType>> inVariable = std::nullopt,
                       ParamType inDefaultValue = ParamType(),
-                      const bool inIsMandatory = false){
+                      const int inMandatoryGroup = NotMandatory){
         std::unique_ptr<AbstractParam> newParam(new Param<ParamType>(
                                                     std::move(inKeys),
                                                     std::move(inHelp),
-                                                    inIsMandatory,
+                                                    inMandatoryGroup,
                                                     std::move(inVariable),
                                                     std::move(inDefaultValue)
                                                     ));
@@ -466,11 +488,11 @@ public:
     }
 
     void addParameterNoArg(std::vector<std::string> inKeys, std::string inHelp,
-                           const bool inIsMandatory = false){
+                           const int inMandatoryGroup = NotMandatory){
         std::unique_ptr<AbstractParam> newParam(new ParamNoArg(
                                                     std::move(inKeys),
                                                     std::move(inHelp),
-                                                    inIsMandatory
+                                                    inMandatoryGroup
                                                     ));
         (*_params).emplace_back(std::move(newParam));
     }
@@ -491,11 +513,18 @@ public:
         inStream << "[HELP] \n";
         inStream << "[HELP] " << _title << "\n";
         inStream << "[HELP] \n";
+        if(!_isValid){
+            inStream << "[HELP] \n";
+            inStream << "[HELP] Currant parameters are not valid...\n";
+            inStream << "[HELP] \n";
+        }
         for(auto& param : *_params){
             inStream << "[HELP] Parameter names: {" << join(param->getKeys(),", ") << "}\n";
             inStream << "[HELP]  - Description: " << param->getHelp() << "\n";
             inStream << "[HELP]  - Type: " << param->getTypeStr() << "\n";
-            inStream << "[HELP]  - Mandatory: " << (param->isMandatory()?"True":"False") << "\n";
+            if(param->isMandatory()){
+                inStream << "[HELP]  - Is mandatory (group " << param->mandatoryGroup() << ")\n";
+            }
             inStream << "[HELP]\n";
         }
         inStream << "[HELP]" << std::endl;
