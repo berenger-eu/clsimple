@@ -7,9 +7,9 @@
 
 int main(int argc, char** argv){
     {
-        int argc =
-
-        CLsimple args("UTest", argc, argv);
+        const int argc = 0;
+        const char *const argv[] = {"a", "b"};
+        //CLsimple args("UTest", argc, argv);
     }
 
     return 0;
