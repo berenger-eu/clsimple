@@ -55,11 +55,11 @@ int main(int argc, char** argv){
                            replex, 0);
 
     int replex_stat;
-    args.addParameter<int>({"replex_stat"}, "number of sweeps between statistic output",
+    args.addParameter<int>({"replex-stat"}, "number of sweeps between statistic output",
                            replex_stat, 1000);
 
     std::string replex_accept;
-    args.addParameter<std::string>({"replex_accept"}, "exchange accept function",
+    args.addParameter<std::string>({"replex-accept"}, "exchange accept function",
                                    replex_accept, "");
 
     std::string movestats;
@@ -69,11 +69,11 @@ int main(int argc, char** argv){
                                   movestats, "pertype");
 
     int nb_threads;
-    args.addParameter<int>({"nb_threads"}, "number of threads",
+    args.addParameter<int>({"nb-threads"}, "number of threads",
                            nb_threads, omp_get_max_threads());
 
     std::string replex_verbosity;
-    args.addParameter<std::string>({"replex_verbosity"}, "exchange log verbosity (stats, all, none)",
+    args.addParameter<std::string>({"replex-verbosity"}, "exchange log verbosity (stats, all, none)",
                                    replex_verbosity, "stats");
 
     ////////////////////////////////////////////////////
