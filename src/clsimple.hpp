@@ -254,7 +254,8 @@ class CLsimple{
     }
 
     template <class ParamType>
-    void processParam(ParamType&& param, bool* parseIsOK = nullptr, std::set<int>* usedFields = nullptr) {
+    void processParam(ParamType&& param, bool* parseIsOK = nullptr,
+                      std::set<int>* usedFields = nullptr, std::ostringstream* inError = nullptr) const {
         const auto& keys = param->getKeys();
         int pos = -1;
         for(const auto& key : keys){
@@ -278,8 +279,8 @@ class CLsimple{
             else if(IsKeyValueFormat(_argv[pos])){
                 const auto keyValue = SplitKeyValue(_argv[pos]);
                 const bool res = param->applyValue(std::get<1>(keyValue));
-                if(!res){
-                    (*errorStr) << "[ERROR] Error in parsing the value for arg \""
+                if(!res && inError){
+                    (*inError) << "[ERROR] Error in parsing the value for arg \""
                              << _argv[pos] << "\"\n";
                 }
                 if(parseIsOK){
@@ -289,8 +290,8 @@ class CLsimple{
                     int idxVal = pos + 1;
                     while(idxVal != int(_argv.size()) && !StrSeemsAKey(_argv[idxVal])){
                         const bool res = param->applyValue(_argv[idxVal]);
-                        if(!res){
-                            (*errorStr) << "[ERROR] Error in parsing the value \"" << _argv[idxVal] << "\" for arg \""
+                        if(!res && inError){
+                            (*inError) << "[ERROR] Error in parsing the value \"" << _argv[idxVal] << "\" for arg \""
                                      << _argv[pos] << "\"\n";
                         }
                         if(parseIsOK){
@@ -308,8 +309,8 @@ class CLsimple{
                     int idxVal = pos + 1;
                     while(idxVal != int(_argv.size()) && !StrSeemsAKey(_argv[idxVal])){
                         const bool res = param->applyValue(_argv[idxVal]);
-                        if(!res){
-                            (*errorStr) << "[ERROR] Error in parsing the value \"" << _argv[idxVal] << "\" for arg \""
+                        if(!res && inError){
+                            (*inError) << "[ERROR] Error in parsing the value \"" << _argv[idxVal] << "\" for arg \""
                                      << _argv[pos] << "\"\n";
                         }
                         if(parseIsOK){
@@ -323,9 +324,10 @@ class CLsimple{
                     if(idxVal == pos + 1){
                         param->applyDefault();
 
-                        (*errorStr) << "[ERROR] Cannot get value, but we expect one, for arg \""
+                        if(inError){
+                            (*errorStr) << "[ERROR] Cannot get value, but we expect one, for arg \""
                                  << _argv[pos] << "\"\n";
-
+                        }
                         if(parseIsOK){
                             (*parseIsOK) = false;
                         }
@@ -333,7 +335,7 @@ class CLsimple{
                 }
                 else{
                     const bool res = param->applyValue(_argv[pos+1]);
-                    if(!res){
+                    if(!res && inError){
                         (*errorStr) << "[ERROR] Error in parsing the value \"" << _argv[pos+1] << "\" for arg \""
                                  << _argv[pos] << "\"\n";
                     }
@@ -347,8 +349,10 @@ class CLsimple{
             }
             else{
                 param->applyDefault();
-                (*errorStr) << "[ERROR] Cannot get value, but we expect one, for arg \""
+                if(inError){
+                    (*errorStr) << "[ERROR] Cannot get value, but we expect one, for arg \""
                          << _argv[pos] << "\"\n";
+                }
                 if(parseIsOK){
                     (*parseIsOK) = false;
                 }
@@ -439,7 +443,7 @@ public:
                   bool* outOk = nullptr) const{
         std::vector<ParamType> variable;
         std::optional<std::reference_wrapper<std::vector<ParamType>>> variableRef(variable);
-        MultiParam<ParamType> newParam(std::move(inKeys), "", false,
+        MultiParam<ParamType> newParam(std::move(inKeys), "", NotMandatory,
                                                     std::move(variableRef),
                                                     std::move(inDefaultValue));
         processParam(&newParam, outOk);
@@ -452,7 +456,7 @@ public:
                   bool* outOk = nullptr) const{
         ParamType variable;
         std::optional<std::reference_wrapper<ParamType>> variableRef(variable);
-        Param<ParamType> newParam(std::move(inKeys), "", false,
+        Param<ParamType> newParam(std::move(inKeys), "", NotMandatory,
                                                     std::move(variableRef),
                                                     std::move(inDefaultValue));
         processParam(&newParam, outOk);
@@ -465,7 +469,7 @@ public:
 
         // Process param values
         for(auto& param : *_params){
-            processParam(param, &parseIsOK, &usedFields);
+            processParam(param, &parseIsOK, &usedFields, errorStr.get());
         }
         if(_failsIfInvalid){
             _isValid = parseIsOK;
