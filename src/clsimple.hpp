@@ -22,8 +22,14 @@
 class CLsimple{
     template <class ParamType>
     static ParamType Convert(const std::string& str, bool* outFlag = nullptr){
-        std::istringstream iss(str, std::istringstream::in);
         ParamType value;
+        if(str.length() == 0){
+            if(outFlag){
+                (*outFlag) = false;
+            }
+            return value;
+        }
+        std::istringstream iss(str, std::istringstream::in);
         iss >> value;
         if(outFlag){
             (*outFlag) = bool(iss.eof());
@@ -135,6 +141,7 @@ class CLsimple{
                     _variable->get().push_back(valueStr == "TRUE" || valueStr == "true" || valueStr == "True");
                     return true;
                 }
+                _variable->get() = _default;
                 return false;
             }
             else{
@@ -144,6 +151,7 @@ class CLsimple{
                     _variable->get().push_back(value);
                     return true;
                 }
+                _variable->get() = _default;
                 return false;
             }
         }
@@ -187,6 +195,7 @@ class CLsimple{
                     _variable->get() = (valueStr == "TRUE" || valueStr == "true" || valueStr == "True");
                     return true;
                 }
+                _variable->get() = _default;
                 return false;
             }
             else{
@@ -240,12 +249,12 @@ class CLsimple{
     }
 
     static bool IsKeyValueFormat(const std::string& str){
-        std::regex keyValueFormat("^--[^=]+=.+");
+        std::regex keyValueFormat("^--[^=]+=.*");
         return std::regex_search(str, keyValueFormat);
     }
 
     static std::pair<std::string,std::string> SplitKeyValue(const std::string& str){
-        std::regex keyValueFormat("^--([^=]+)=(.+)");
+        std::regex keyValueFormat("^--([^=]+)=(.*)");
         std::smatch match;
         std::regex_search(str, match, keyValueFormat);
         const std::string key = match[1];
@@ -256,6 +265,7 @@ class CLsimple{
     template <class ParamType>
     void processParam(ParamType&& param, bool* parseIsOK = nullptr,
                       std::set<int>* usedFields = nullptr, std::ostringstream* inError = nullptr) const {
+
         const auto& keys = param->getKeys();
         int pos = -1;
         for(const auto& key : keys){
@@ -268,8 +278,15 @@ class CLsimple{
 
         if(pos == -1){
             param->applyDefault();
+            if(parseIsOK){
+                (*parseIsOK) = false;
+            }
         }
         else{
+            if(parseIsOK){
+                (*parseIsOK) = true;
+            }
+
             if(usedFields){
                 (*usedFields).insert(pos);
             }

@@ -28,6 +28,14 @@ if(CLSIMPLE_LIBRARIES)
     target_link_libraries(test.exe ${CLSIMPLE_LIBRARIES})
 endif()
 
+#################################################
+
+add_executable(example.exe tests/example.cpp)
+target_include_directories(example.exe PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(CLSIMPLE_LIBRARIES)
+    target_link_libraries(example.exe ${CLSIMPLE_LIBRARIES})
+endif()
+
 
 #################################################
 
