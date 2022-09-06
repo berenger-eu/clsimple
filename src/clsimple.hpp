@@ -226,7 +226,7 @@ class CLsimple{
                    const int inMandatoryGroup):
             AbstractParam(std::move(inKeys), std::move(inHelp), NoArg, inMandatoryGroup){}
 
-        bool applyValue(const std::string& inValue) final{
+        bool applyValue([[maybe_unused]] const std::string& inValue) final{
             return true;
         }
         void applyDefault() final{
@@ -295,13 +295,15 @@ class CLsimple{
             }
             else if(IsKeyValueFormat(_argv[pos])){
                 const auto keyValue = SplitKeyValue(_argv[pos]);
-                const bool res = param->applyValue(std::get<1>(keyValue));
-                if(!res && inError){
-                    (*inError) << "[ERROR] Error in parsing the value for arg \""
-                             << _argv[pos] << "\"\n";
-                }
-                if(parseIsOK){
-                    (*parseIsOK) &= res;
+                {
+                    const bool res = param->applyValue(std::get<1>(keyValue));
+                    if(!res && inError){
+                        (*inError) << "[ERROR] Error in parsing the value for arg \""
+                                 << _argv[pos] << "\"\n";
+                    }
+                    if(parseIsOK){
+                        (*parseIsOK) &= res;
+                    }
                 }
                 if(param->isMulti()){
                     int idxVal = pos + 1;

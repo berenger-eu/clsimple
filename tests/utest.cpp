@@ -10,7 +10,7 @@
         std::cout << " => " << #X << std::endl;\
     }
 
-int main(int argc, char** argv){
+int main(){
     {
         const char *const argv[] = {"exec", "-a", "-b", "c", "d"};
         const int argc = 5;

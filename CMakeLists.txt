@@ -7,6 +7,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+
+#################################################
+set(CLSIMPLE_EXTRA_FLAG "-Wextra -Wnon-virtual-dtor -Wshadow -Wpointer-arith -Wcast-qual -Wconversion  -Wall -Wno-sign-conversion -pedantic -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wconversion -Wno-error" CACHE STRING "Additional flags"  )
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CLSIMPLE_EXTRA_FLAG}")
+
 #################################################
 
 option(USE_COVERAGE "Should be ON to enable code coverage" OFF)
