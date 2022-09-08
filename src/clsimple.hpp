@@ -278,7 +278,7 @@ class CLsimple{
 
         if(pos == -1){
             param->applyDefault();
-            if(parseIsOK){
+            if(parseIsOK && param->isMandatory()){
                 (*parseIsOK) = false;
             }
         }
@@ -488,7 +488,9 @@ public:
 
         // Process param values
         for(auto& param : *_params){
-            processParam(param, &parseIsOK, &usedFields, errorStr.get());
+            bool parseIsOKLocal = true;
+            processParam(param, &parseIsOKLocal, &usedFields, errorStr.get());
+            parseIsOK &= parseIsOKLocal;
         }
         if(_failsIfInvalid){
             _isValid = parseIsOK;
