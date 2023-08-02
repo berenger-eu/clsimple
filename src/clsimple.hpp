@@ -484,17 +484,21 @@ public:
     }
 
     bool parse(){
-        bool parseIsOK = true;
+        std::unordered_map<int, bool> parseIsOK;
         std::set<int> usedFields;
 
         // Process param values
         for(auto& param : *_params){
             bool parseIsOKLocal = true;
             processParam(param, &parseIsOKLocal, &usedFields, errorStr.get());
-            parseIsOK &= parseIsOKLocal;
+            if(parseIsOK.find(param->mandatoryGroup()) == parseIsOK.end()){
+                parseIsOK[param->mandatoryGroup()] = parseIsOKLocal;
+            }
+            else{
+                parseIsOK[param->mandatoryGroup()] &= parseIsOKLocal;
+            }
         }
         if(_failsIfInvalid){
-            _isValid = parseIsOK;
             if(!_acceptUnregisteredParams && usedFields.size() != _argv.size()){
                 (*errorStr) << "[ERROR] The following arguments are invalid:\n";
                 for(int idx = 0 ; idx < int(_argv.size()) ; ++idx){
@@ -510,7 +514,7 @@ public:
         for(auto& param : *_params){
             if(param->isMandatory()){
                 if(groupStates.find(param->mandatoryGroup()) == groupStates.end()){
-                    groupStates[param->mandatoryGroup()] = true;
+                    groupStates[param->mandatoryGroup()] = parseIsOK[param->mandatoryGroup()];
                 }
                 const auto& keys = param->getKeys();
                 groupStates[param->mandatoryGroup()] &= hasOneOfKeys(keys);
