@@ -156,6 +156,21 @@ int main(){
             assert(value == -1);
         }
     }
+    {
+        const char *const argv[] = {"exec", "--matrix", "foo"};
+        const int argc = 3;
+        CLsimple args("Cuspmv", argc, argv);
+
+        args.addParameterNoArg({"help"}, "help");
+
+        std::string matrixFile;
+        args.addParameter<std::string>({"matrix"}, "matrix file", matrixFile, "");
+
+        args.parse();
+        assert(args.isValid());
+        assert(!args.hasKey("help"));
+        assert(matrixFile == "foo");
+    }
 
     return 0;
 }
