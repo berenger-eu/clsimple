@@ -19,21 +19,49 @@
 #include <cassert>
 #include <set>
 #include <unordered_map>
+#include <functional>
+#include <initializer_list>
+#include <utility>
 
 class CLsimple{
     template <class ParamType>
     static ParamType Convert(const std::string& str, bool* outFlag = nullptr){
-        ParamType value;
-        if(str.length() == 0){
-            if(outFlag){
-                (*outFlag) = false;
-            }
-            return value;
+        ParamType value{};
+        bool valid = false;
+        if constexpr(std::is_same<ParamType, std::string>::value){
+            value = str;
+            valid = true;
         }
-        std::istringstream iss(str, std::istringstream::in);
-        iss >> value;
+        else if constexpr(std::is_same<ParamType, bool>::value){
+            if(str == "true" || str == "True" || str == "TRUE"){
+                value = true;
+                valid = true;
+            }
+            else if(str == "false" || str == "False" || str == "FALSE"){
+                valid = true;
+            }
+            else{
+                bool integerValid = false;
+                const int integer = Convert<int>(str, &integerValid);
+                value = integer != 0;
+                valid = integerValid;
+            }
+        }
+        else if(!str.empty()){
+            std::istringstream iss(str);
+            // Unsigned extraction otherwise accepts negative numbers by wrapping.
+            if constexpr(std::is_unsigned<ParamType>::value){
+                iss >> std::ws;
+                if(iss.peek() == '-'){
+                    if(outFlag){ *outFlag = false; }
+                    return value;
+                }
+            }
+            iss >> value;
+            valid = !iss.fail() && iss.peek() == std::char_traits<char>::eof();
+        }
         if(outFlag){
-            (*outFlag) = bool(iss.eof());
+            *outFlag = valid;
         }
         return value;
     }
@@ -110,6 +138,7 @@ class CLsimple{
 
         virtual bool applyValue(const std::string& inValue) = 0;
         virtual void applyDefault() = 0;
+        virtual void resetValue(){ applyDefault(); }
         virtual std::string getTypeStr() const = 0;
     };
 
@@ -129,31 +158,16 @@ class CLsimple{
             _default(std::move(inDefault)){}
 
         bool applyValue(const std::string& inValue) final{
-            if constexpr (std::is_same<ParamType, bool>::value){
-                bool convertionOkInt;
-                auto valueInt = Convert<int>(inValue, &convertionOkInt);
-                if(_variable && convertionOkInt){
-                    _variable->get().push_back(bool(valueInt));
-                    return true;
-                }
-                bool convertionOkStr;
-                auto valueStr = Convert<std::string>(inValue, &convertionOkStr);
-                if(_variable && convertionOkStr){
-                    _variable->get().push_back(valueStr == "TRUE" || valueStr == "true" || valueStr == "True");
-                    return true;
-                }
-                _variable->get() = _default;
-                return false;
+            bool conversionOk = false;
+            const auto value = Convert<ParamType>(inValue, &conversionOk);
+            if(conversionOk && _variable){
+                _variable->get().push_back(value);
             }
-            else{
-                bool convertionOk;
-                auto value = Convert<ParamType>(inValue, &convertionOk);
-                if(_variable && convertionOk){
-                    _variable->get().push_back(value);
-                    return true;
-                }
-                _variable->get() = _default;
-                return false;
+            return conversionOk;
+        }
+        void resetValue() final{
+            if(_variable){
+                _variable->get().clear();
             }
         }
         void applyDefault() final{
@@ -183,32 +197,12 @@ class CLsimple{
             _default(std::move(inDefault)){}
 
         bool applyValue(const std::string& inValue) final{
-            if constexpr (std::is_same<ParamType, bool>::value){
-                bool convertionOkInt;
-                auto valueInt = Convert<int>(inValue, &convertionOkInt);
-                if(_variable && convertionOkInt){
-                    _variable->get() = bool(valueInt);
-                    return true;
-                }
-                bool convertionOkStr;
-                auto valueStr = Convert<std::string>(inValue, &convertionOkStr);
-                if(_variable && convertionOkStr){
-                    _variable->get() = (valueStr == "TRUE" || valueStr == "true" || valueStr == "True");
-                    return true;
-                }
-                _variable->get() = _default;
-                return false;
+            bool conversionOk = false;
+            const auto value = Convert<ParamType>(inValue, &conversionOk);
+            if(conversionOk && _variable){
+                _variable->get() = value;
             }
-            else{
-                bool convertionOk;
-                auto value = Convert<ParamType>(inValue, &convertionOk);
-                if(_variable && convertionOk){
-                    _variable->get() = value;
-                    return true;
-                }
-                _variable->get() = _default;
-                return false;
-            }
+            return conversionOk;
         }
         void applyDefault() final{
             if(_variable){
@@ -238,149 +232,93 @@ class CLsimple{
     };
 
     static bool StrSeemsAKey(const std::string& str){
-        std::regex keyFormat("^-{1,2}(\\D|[0-9]+\\D)");
-        return std::regex_search(str, keyFormat);
+        if(str.size() < 2 || str[0] != '-'){
+            return false;
+        }
+        static const std::regex numberFormat(
+            R"(^-([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$)");
+        return !std::regex_match(str, numberFormat);
     }
 
     static std::string StrToKey(const std::string& str){
-        std::regex keyValueFormat("^-{1,2}([^=]+).*");
-        std::smatch match;
-        std::regex_search(str, match, keyValueFormat);
-        return match[1];
+        const std::size_t begin = str.compare(0, 2, "--") == 0 ? 2 : 1;
+        return str.substr(begin, str.find('=', begin) - begin);
     }
 
     static bool IsKeyValueFormat(const std::string& str){
-        std::regex keyValueFormat("^--[^=]+=.*");
-        return std::regex_search(str, keyValueFormat);
+        return str.compare(0, 2, "--") == 0 && str.find('=', 2) != std::string::npos
+                && str.find('=', 2) > 2;
     }
 
     static std::pair<std::string,std::string> SplitKeyValue(const std::string& str){
-        std::regex keyValueFormat("^--([^=]+)=(.*)");
-        std::smatch match;
-        std::regex_search(str, match, keyValueFormat);
-        const std::string key = match[1];
-        const std::string value = match[2];
-        return std::pair<std::string,std::string>(std::move(key), std::move(value));
+        const auto separator = str.find('=', 2);
+        return {str.substr(2, separator - 2), str.substr(separator + 1)};
     }
 
     template <class ParamType>
     void processParam(ParamType&& param, bool* parseIsOK = nullptr,
                       std::set<int>* usedFields = nullptr, std::ostringstream* inError = nullptr) const {
 
-        const auto& keys = param->getKeys();
         int pos = -1;
-        for(const auto& key : keys){
-            const int testPos = getKeyPos(key);
-            if(testPos != -1){
-                pos = testPos;
-                break;
-            }
+        for(const auto& key : param->getKeys()){
+            pos = getKeyPos(key);
+            if(pos != -1){ break; }
         }
-
+        if(parseIsOK){ *parseIsOK = false; }
         if(pos == -1){
             param->applyDefault();
-            if(parseIsOK && param->isMandatory()){
-                (*parseIsOK) = false;
+            return;
+        }
+
+        param->resetValue();
+        if(usedFields){ usedFields->insert(pos); }
+        bool valid = true;
+        auto apply = [&](const std::string& value){
+            if(!param->applyValue(value)){
+                valid = false;
+                if(inError){
+                    *inError << "[ERROR] Error in parsing the value \"" << value
+                             << "\" for arg \"" << _argv[pos] << "\"\n";
+                }
+            }
+        };
+        const bool inlineValue = IsKeyValueFormat(_argv[pos]);
+        if(param->isNoArg()){
+            if(inlineValue){
+                valid = false;
+                if(inError){
+                    *inError << "[ERROR] Argument \"" << _argv[pos]
+                             << "\" does not accept a value\n";
+                }
             }
         }
         else{
-            if(parseIsOK){
-                (*parseIsOK) = true;
+            int count = 0;
+            if(inlineValue){
+                apply(SplitKeyValue(_argv[pos]).second);
+                ++count;
             }
-
-            if(usedFields){
-                (*usedFields).insert(pos);
+            int idxVal = pos + 1;
+            while((param->isMulti() || count == 0) && idxVal < int(_argv.size())
+                  && !StrSeemsAKey(_argv[idxVal])){
+                apply(_argv[idxVal]);
+                if(usedFields){ usedFields->insert(idxVal); }
+                ++idxVal;
+                ++count;
             }
-            if(param->isNoArg()){
-                // Do nothing
-            }
-            else if(IsKeyValueFormat(_argv[pos])){
-                const auto keyValue = SplitKeyValue(_argv[pos]);
-                {
-                    const bool res = param->applyValue(std::get<1>(keyValue));
-                    if(!res && inError){
-                        (*inError) << "[ERROR] Error in parsing the value for arg \""
-                                 << _argv[pos] << "\"\n";
-                    }
-                    if(parseIsOK){
-                        (*parseIsOK) &= res;
-                    }
-                }
-                if(param->isMulti()){
-                    int idxVal = pos + 1;
-                    while(idxVal != int(_argv.size()) && !StrSeemsAKey(_argv[idxVal])){
-                        const bool res = param->applyValue(_argv[idxVal]);
-                        if(!res && inError){
-                            (*inError) << "[ERROR] Error in parsing the value \"" << _argv[idxVal] << "\" for arg \""
-                                     << _argv[pos] << "\"\n";
-                        }
-                        if(parseIsOK){
-                            (*parseIsOK) &= res;
-                        }
-                        if(usedFields){
-                            (*usedFields).insert(idxVal);
-                        }
-                        idxVal += 1;
-                    }
-                }
-            }
-            else if(pos+1 != int(_argv.size())){
-                if(param->isMulti()){
-                    int idxVal = pos + 1;
-                    while(idxVal != int(_argv.size()) && !StrSeemsAKey(_argv[idxVal])){
-                        const bool res = param->applyValue(_argv[idxVal]);
-                        if(!res && inError){
-                            (*inError) << "[ERROR] Error in parsing the value \"" << _argv[idxVal] << "\" for arg \""
-                                     << _argv[pos] << "\"\n";
-                        }
-                        if(parseIsOK){
-                            (*parseIsOK) &= res;
-                        }
-                        if(usedFields){
-                            (*usedFields).insert(idxVal);
-                        }
-                        idxVal += 1;
-                    }
-                    if(idxVal == pos + 1){
-                        param->applyDefault();
-
-                        if(inError){
-                            (*errorStr) << "[ERROR] Cannot get value, but we expect one, for arg \""
-                                 << _argv[pos] << "\"\n";
-                        }
-                        if(parseIsOK){
-                            (*parseIsOK) = false;
-                        }
-                    }
-                }
-                else{
-                    const bool res = param->applyValue(_argv[pos+1]);
-                    if(!res && inError){
-                        (*errorStr) << "[ERROR] Error in parsing the value \"" << _argv[pos+1] << "\" for arg \""
-                                 << _argv[pos] << "\"\n";
-                    }
-                    if(parseIsOK){
-                        (*parseIsOK) &= res;
-                    }
-                    if(usedFields){
-                        (*usedFields).insert(pos+1);
-                    }
-                }
-            }
-            else{
-                param->applyDefault();
+            if(count == 0){
+                valid = false;
                 if(inError){
-                    (*errorStr) << "[ERROR] Cannot get value, but we expect one, for arg \""
-                         << _argv[pos] << "\"\n";
-                }
-                if(parseIsOK){
-                    (*parseIsOK) = false;
+                    *inError << "[ERROR] Cannot get value, but we expect one, for arg \""
+                             << _argv[pos] << "\"\n";
                 }
             }
         }
+        if(!valid){ param->applyDefault(); }
+        if(parseIsOK){ *parseIsOK = valid; }
     }
 
-    const std::string _title;
+    std::string _title;
     std::string _exec;
 
     std::vector<std::string> _argv;
@@ -484,6 +422,9 @@ public:
     }
 
     bool parse(){
+        _isValid = true;
+        errorStr->str("");
+        errorStr->clear();
         std::unordered_map<int, bool> parseIsOK;
         std::set<int> usedFields;
 
@@ -491,6 +432,9 @@ public:
         for(auto& param : *_params){
             bool parseIsOKLocal = true;
             processParam(param, &parseIsOKLocal, &usedFields, errorStr.get());
+            if(hasOneOfKeys(param->getKeys()) && !parseIsOKLocal){
+                _isValid = false;
+            }
             if(parseIsOK.find(param->mandatoryGroup()) == parseIsOK.end()){
                 parseIsOK[param->mandatoryGroup()] = parseIsOKLocal;
             }
@@ -529,7 +473,7 @@ public:
                 }
             }
             if(!oneGroupIsOk){
-                (*errorStr) << "[ERROR] Some arguments are mandatory, but none of them were provided...\n";
+                (*errorStr) << "[ERROR] No mandatory parameter group was fully provided with valid values.\n";
             }
 
             _isValid &= oneGroupIsOk;
@@ -582,7 +526,7 @@ public:
         auto join = [](auto&& elements, auto&& delimiter) -> std::string {
             std::string res;
             for(const auto& elm : elements){
-                if(std::size(res)){
+                if(!res.empty()){
                     res += delimiter;
                 }
                 res += elm;
@@ -595,7 +539,7 @@ public:
         inStream << "[HELP] \n";
         if(!_isValid){
             inStream << "[HELP] \n";
-            inStream << "[HELP] Currant parameters are not valid...\n";
+            inStream << "[HELP] Current parameters are not valid...\n";
             inStream << "[HELP] \n";
         }
         for(auto& param : *_params){
@@ -636,7 +580,7 @@ public:
         const std::string errors = (*errorStr).str();
         if(errors.length()){
             inStream << "[ERROR] There are some errors...\n";
-            inStream << errors << std::endl;;
+            inStream << errors << std::endl;
         }
     }
 

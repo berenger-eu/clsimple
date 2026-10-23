@@ -1,5 +1,5 @@
-cmake_minimum_required (VERSION 3.0)
-project (CLSIMPLE)
+cmake_minimum_required (VERSION 3.10)
+project (CLSIMPLE LANGUAGES CXX)
 
 #################################################
 
@@ -20,7 +20,7 @@ if( USE_COVERAGE )
     message(STATUS "Use code coverage")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 --coverage")
     list(APPEND CLSIMPLE_LIBRARIES gcov)
-    # Then one can use these commande:
+    # Then one can use these commands:
     # lcov --directory CMakeFiles/ -c -o coverage-rapport.info
     # genhtml -o ./coverage -t "Coverage example" coverage-rapport.info
 endif()
@@ -47,14 +47,14 @@ endif()
 option(USE_TESTING "Should be ON to enable unit tests" OFF)
 
 if( USE_TESTING )
-    MESSAGE(STATUS "Testing is enable")
+    MESSAGE(STATUS "Testing is enabled")
     enable_testing()
     add_executable(utest.exe tests/utest.cpp)
     target_include_directories(utest.exe PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
     if(CLSIMPLE_LIBRARIES)
         target_link_libraries(utest.exe ${CLSIMPLE_LIBRARIES})
     endif()
-    add_test(utest.exe ${CMAKE_CURRENT_BINARY_DIR}/utest.exe)
+    add_test(NAME utest.exe COMMAND utest.exe)
 endif()
 
 #################################################

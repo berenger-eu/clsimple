@@ -23,7 +23,6 @@ int main(int argc, char** argv){
     ////////////////////////////////////////////////////
 
     args.addParameterNoArg({"help"}, "help");
-    args.addParameterNoArg({"version"}, "version");
 
     std::vector<std::string> multidir;
     args.addMultiParameter<std::string>({"multidir"}, "multiple simulation directories",
